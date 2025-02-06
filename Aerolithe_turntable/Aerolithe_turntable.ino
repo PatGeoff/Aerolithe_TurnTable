@@ -1,3 +1,4 @@
+// Projet Final pour la table tournante de Aerolithe
 // Ce programme est pour faire fonctionner un ESP32 WaveShare Servo avec écran
 // https://www.waveshare.com/product/modules/motors-servos/drivers/servo-driver-with-esp32.html
 // Board ESP32 Dev Module
