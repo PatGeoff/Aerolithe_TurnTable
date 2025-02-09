@@ -16,9 +16,9 @@ const char* ssid = "Aerolithe";
 const char* password = "Galactium2013";
 const int ID = 1;
 const int udpPort = 44466;  // Change as needed.   44477 for scissor lift, 44466 for the turntable
-const char* windows_hostname = "WinImacProPat"; // À changer au nom du pc qui sera utilisé
-//const IPAddress windows_IP(192, 168, 2, 4);  // À cause de Parallels Desktop, c'est l'adresse de Windows en mode Bridged Wifi et elle peut changer alors vérifier
-unsigned int senderPort = 55544;   // Port of the remote coputer sending messages, initializes to 0;
+//const char* windows_hostname = "WinImacProPat";  // À changer au nom du pc qui sera utilisé
+const IPAddress windows_IP(192, 168, 2, 4);  // À cause de Parallels Desktop, c'est l'adresse de Windows en mode Bridged Wifi et elle peut changer alors vérifier
+unsigned int senderPort = 55544;             // Port of the remote coputer sending messages, initializes to 0;
 
 SMS_STS st;
 // the uart used to control servos.
@@ -32,13 +32,16 @@ WiFiUDP udp;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Static IP configuration
-IPAddress local_IP(192,168,2,12);     // "192,168,2,12" for turntable 
-IPAddress gateway(192,168,2,1);
-IPAddress subnet(255,255,255,0);
+IPAddress local_IP(192, 168, 2, 12);  // "192,168,2,12" for turntable
+IPAddress gateway(192, 168, 2, 1);
+IPAddress subnet(255, 255, 255, 0);
 
 unsigned long previousMillis = 0;  // Stores the last time the display was updated
 const long interval = 3000;        // Interval to display packet data (3 seconds)
 bool displayPacket = false;        // Flag to indicate if packet data should be displayed
+const long sendPosInterval = 500;
+double previousPos = 0;
+double currentPos = 0;
 
 enum ServoState {
   IDLE,
@@ -115,6 +118,7 @@ void loop() {
     displayPacket = false;  // Reset the flag
   }
 
+
   // Display the appropriate information
   if (displayPacket) {
     // Packet data is already displayed in analizePacket
@@ -128,10 +132,17 @@ void loop() {
     //Serial.print("Current Position: ");
     //Serial.println(currentPosition);
     if (isServoAtPosition(servoID, targetPosition)) {
-      Serial.println("Servo has reached the desired position!");
-      sendResponse("Message de Table Tournante: Position atteinte");
+      //Serial.println("Servo has reached the desired position!");
+      //sendResponse("Message de Table Tournante: Position atteinte");
       servoState = IDLE;  // Change state to IDLE
     }
+    
+    // if (currentPosition != previousPos) {
+    //   String message = "waveshare -> position," + String((int)currentPosition);
+    //   const char* cMessage = message.c_str();
+    //   sendResponse(cMessage);      
+    // }
+    previousPos = currentPosition;
     delay(100);  // Add a small delay to allow the servo to move
   }
 }
@@ -177,8 +188,18 @@ void analizePacket(int packetSize) {
 void analizeMessage(char packetData[]) {
   // Check if the message is "status"
   if (strcmp(packetData, "status") == 0) {
-    sendResponse("ok waveshare");
+    sendResponse("waveshare --> status ok");
     return;
+  }
+
+  if (strncmp(packetData, "Aerolithe_Asks_GetPosition", 25) == 0) {
+    double speed = st.ReadPos(servoID);
+    String message = "waveshare -> position," + String((int)speed);
+    const char* cMessage = message.c_str();
+    sendResponse(cMessage);
+    return;
+  } else {
+    //Serial.println("UDP -> Error: Invalid stepmotor command format.");
   }
 
   // Assuming the message format is "turntable,position,speed"
@@ -195,7 +216,7 @@ void analizeMessage(char packetData[]) {
         Serial.print(" Speed: ");
         Serial.println(speed);
         st.WritePosEx(servoID, targetPosition, speed, 50);  // Use the parsed speed value
-        servoState = MOVING;  // Change state to MOVING
+        servoState = MOVING;                                // Change state to MOVING
       }
     }
   }
@@ -210,7 +231,7 @@ void sendResponse(const char* message) {
   Serial.print(" on port ");
   Serial.println(senderPort);
 
-  udp.beginPacket(windows_hostname, senderPort);
+  udp.beginPacket(windows_IP, senderPort);
   udp.write((const uint8_t*)message, strlen(message));  // Correct conversion and length
 
   int result = udp.endPacket();
@@ -221,4 +242,3 @@ void sendResponse(const char* message) {
     Serial.println(result);
   }
 }
-
